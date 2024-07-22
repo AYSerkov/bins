@@ -19,8 +19,6 @@
     Invoke-CertImpersonate -Username <DOMAIN>\<Username> -CA <ADCS Server>\<CA> -Template <Template>"
     Invoke-CertImpersonate -Username CICADA\DomainAdmin -CA CA.cicada8.local\CICADA-ADCS-CA -Template User"
     
- Author:
-   Alexander Serkov (TG @AY_Serkov)
 #>
 
 param (
